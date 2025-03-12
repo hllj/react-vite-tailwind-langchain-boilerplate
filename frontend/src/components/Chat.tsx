@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
-import { useWindowDimensions } from '../hooks/useWindowDimensions';
 import { apiService } from '../services/api';
 import { socketService } from '../services/socket';
 import { ApiMessage, StreamingMessage } from '../types/api';
@@ -15,7 +14,6 @@ export default function Chat() {
   const [connectionStatus, setConnectionStatus] = useState('Disconnected');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { height } = useWindowDimensions();
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -130,10 +128,11 @@ export default function Chat() {
       setMessages(prev => [...prev]);
     };
 
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+    const viewport = window.visualViewport;
+    if (viewport) {
+      viewport.addEventListener('resize', handleVisualViewportResize);
       return () => {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+        viewport.removeEventListener('resize', handleVisualViewportResize);
       };
     }
   }, []);
