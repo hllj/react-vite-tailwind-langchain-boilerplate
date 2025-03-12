@@ -153,7 +153,7 @@ A modern chat application built with React and FastAPI, featuring AI agents powe
 - **Modern, responsive UI** with dark mode support that adapts to any device size
 - **Real-time chat interface** with smooth animations and user-friendly design
 - **Powered by Google's Gemini AI model** for high-quality, context-aware responses
-- **Streaming responses** (coming soon) for more natural conversation experience
+- **Streaming responses** for more natural conversation experience
 - **Conversation history** maintained throughout your session
 - **Error handling and loading states** for robust user experience
 
@@ -206,7 +206,7 @@ Found a bug or have a feature request? Please open an issue:
 
 ## Roadmap
 
-- [ ] Implement streaming responses
+- [x] Implement streaming responses
 - [ ] Add authentication and user accounts
 - [ ] Support for file uploads and multimodal inputs
 - [ ] Multiple AI model selection

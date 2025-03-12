@@ -2,20 +2,17 @@ import { useState, useRef, useEffect } from 'react';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 import { useWindowDimensions } from '../hooks/useWindowDimensions';
 import { apiService } from '../services/api';
-import { ApiMessage } from '../types/api';
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'bot';
-  timestamp: Date;
-}
+import { socketService } from '../services/socket';
+import { ApiMessage, StreamingMessage } from '../types/api';
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<StreamingMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [useStreaming, setUseStreaming] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState('Disconnected');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { height } = useWindowDimensions();
@@ -30,16 +27,109 @@ export default function Chat() {
     inputRef.current?.focus();
   }, []);
 
-  // Add this effect to handle mobile browser address bar showing/hiding
+  // Setup socket connection
   useEffect(() => {
-    // This ensures the chat container adjusts when the viewport height changes
-    // (like when mobile browser shows/hides address bar)
+    // Check connection status every second
+    const connectionChecker = setInterval(() => {
+      const connected = socketService.isConnected();
+      setIsSocketConnected(connected);
+      setConnectionStatus(connected ? 'Connected' : 'Disconnected');
+    }, 1000);
+
+    // Connect socket
+    try {
+      socketService.connect();
+      
+      // Setup socket listeners for streaming
+      socketService.onChatStart(() => {
+        console.log('[Chat Component] Chat stream starting');
+      });
+      
+      socketService.onChatToken((token) => {
+        console.log('[Chat Component] Received token:', token);
+        
+        setMessages(prev => {
+          const lastMessage = prev[prev.length - 1];
+          
+          if (lastMessage && lastMessage.isStreaming) {
+            // Create a new array to ensure React detects the change
+            const updatedMessages = [...prev];
+            updatedMessages[prev.length - 1] = {
+              ...lastMessage,
+              text: lastMessage.text + token
+            };
+            return updatedMessages;
+          }
+          return prev;
+        });
+      });
+      
+      socketService.onChatComplete((data) => {
+        console.log('[Chat Component] Chat stream complete');
+        
+        setMessages(prev => {
+          // Create a new array to ensure React detects the change
+          const updatedMessages = [...prev];
+          const lastMessage = prev[prev.length - 1];
+          
+          if (lastMessage && lastMessage.isStreaming) {
+            updatedMessages[prev.length - 1] = {
+              ...lastMessage,
+              isStreaming: false,
+              model: data.model
+            };
+          }
+          return updatedMessages;
+        });
+        
+        setIsLoading(false);
+        inputRef.current?.focus();
+      });
+      
+      socketService.onChatError((data) => {
+        console.error('[Chat Component] Chat error:', data);
+        
+        // Remove any streaming message first
+        setMessages(prev => {
+          if (prev.length > 0 && prev[prev.length - 1].isStreaming) {
+            return prev.slice(0, -1);
+          }
+          return prev;
+        });
+        
+        // Then add the error message
+        setMessages(prev => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            text: `Sorry, I encountered an error: ${data.message || 'Please try again later.'}`,
+            sender: 'bot',
+            timestamp: new Date(),
+          }
+        ]);
+        
+        setError(data.message || 'Unknown error occurred');
+        setIsLoading(false);
+      });
+      
+      return () => {
+        clearInterval(connectionChecker);
+        socketService.disconnect();
+      };
+    } catch (error) {
+      console.error('[Chat Component] Error setting up socket:', error);
+      setIsSocketConnected(false);
+      setConnectionStatus('Error: Failed to connect');
+      clearInterval(connectionChecker);
+    }
+  }, []);
+  
+  // Handle mobile browser address bar showing/hiding
+  useEffect(() => {
     const handleVisualViewportResize = () => {
-      // Just triggering a re-render is enough as we're using h-full
       setMessages(prev => [...prev]);
     };
 
-    // Some browsers support visualViewport API
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleVisualViewportResize);
       return () => {
@@ -52,7 +142,7 @@ export default function Chat() {
     if (!inputValue.trim() || isLoading) return;
     
     // Create a new user message
-    const userMessage: Message = {
+    const userMessage: StreamingMessage = {
       id: Date.now().toString(),
       text: inputValue.trim(),
       sender: 'user',
@@ -65,11 +155,43 @@ export default function Chat() {
     setIsLoading(true);
     setError(null);
     
-    try {
-      const apiMessages: ApiMessage[] = [
-        { role: 'user', content: userMessage.text }
-      ];
+    const apiMessages: ApiMessage[] = [
+      { role: 'user', content: userMessage.text }
+    ];
+    
+    if (useStreaming && isSocketConnected) {
+      console.log('[Chat Component] Using streaming mode');
       
+      // Create an empty bot message that will be filled by streaming
+      const streamingMessage: StreamingMessage = {
+        id: (Date.now() + 1).toString(),
+        text: '',
+        sender: 'bot',
+        timestamp: new Date(),
+        isStreaming: true
+      };
+      
+      // Add the streaming message placeholder
+      setMessages(prev => [...prev, streamingMessage]);
+      
+      try {
+        // Send request using socket for streaming
+        socketService.sendChatRequest(apiMessages, 'gemini-2.0-flash');
+      } catch (error) {
+        console.error('[Chat Component] Error sending socket message:', error);
+        
+        // Fall back to non-streaming API
+        handleNonStreamingRequest(apiMessages);
+      }
+    } else {
+      console.log('[Chat Component] Using non-streaming mode');
+      // Use non-streaming approach
+      handleNonStreamingRequest(apiMessages);
+    }
+  };
+  
+  const handleNonStreamingRequest = async (apiMessages: ApiMessage[]) => {
+    try {
       // Send request using our API service
       const data = await apiService.sendChatRequest({
         messages: apiMessages,
@@ -77,7 +199,7 @@ export default function Chat() {
       });
       
       // Create bot message from response
-      const botMessage: Message = {
+      const botMessage: StreamingMessage = {
         id: (Date.now() + 1).toString(),
         text: data.response,
         sender: 'bot',
@@ -87,10 +209,10 @@ export default function Chat() {
       // Add bot message to chat
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('[Chat Component] Error sending message:', error);
       
       // Add error message
-      const errorMessage: Message = {
+      const errorMessage: StreamingMessage = {
         id: (Date.now() + 1).toString(),
         text: `Sorry, I encountered an error: ${(error as any).message || 'Please try again later.'}`,
         sender: 'bot',
@@ -115,9 +237,30 @@ export default function Chat() {
       handleSendMessage();
     }
   };
+  
+  const toggleStreamingMode = () => {
+    setUseStreaming(prev => !prev);
+  };
 
   return (
     <div className="chat-container">
+      <div className="chat-controls flex justify-between items-center mb-2">
+        <button 
+          onClick={toggleStreamingMode} 
+          className={`text-xs px-2 py-1 rounded ${useStreaming ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+        >
+          {useStreaming ? 'Streaming Mode: ON' : 'Streaming Mode: OFF'}
+        </button>
+        
+        <div className={`text-xs px-2 py-1 rounded ${
+          isSocketConnected 
+            ? 'bg-green-500 text-white' 
+            : 'bg-red-500 text-white'
+        }`}>
+          Socket: {connectionStatus}
+        </div>
+      </div>
+      
       <div className="chat-messages">
         {messages.length === 0 && (
           <div className="text-center text-gray-500 dark:text-gray-400 py-8">
@@ -129,14 +272,17 @@ export default function Chat() {
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`message ${message.sender === 'user' ? 'user-message' : 'bot-message'}`}
+            className={`message ${message.sender === 'user' ? 'user-message' : 'bot-message'} ${message.isStreaming ? 'streaming' : ''}`}
           >
-            {message.text}
+            {message.text || ' '}
+            {message.isStreaming && (
+              <span className="cursor-animation">▌</span>
+            )}
             <div className="message-time">{formatTime(message.timestamp)}</div>
           </div>
         ))}
         
-        {isLoading && (
+        {isLoading && !messages.some(m => m.isStreaming) && (
           <div className="message bot-message typing-indicator">
             <span className="typing-dot" style={{ animationDelay: '0ms' }}></span>
             <span className="typing-dot" style={{ animationDelay: '150ms' }}></span>
