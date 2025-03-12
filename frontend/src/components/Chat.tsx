@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { PaperAirplaneIcon, PaperClipIcon } from '@heroicons/react/24/solid';
 import { apiService } from '../services/api';
 import { socketService } from '../services/socket';
-import { ApiMessage, StreamingMessage, FileAttachment, ContentPart } from '../types/api';
+import { ApiMessage, StreamingMessage, FileAttachment } from '../types/api';
 import FileUpload, { FileItem } from './FileUpload';
 
 export default function Chat() {
@@ -136,7 +136,7 @@ export default function Chat() {
               ...lastMessage,
               files: [...(lastMessage.files || []), {
                 id: `img_${Date.now()}`,
-                type: 'image',
+                type: 'image' as const,
                 name: 'AI Generated Image',
                 url: imageData.url,
                 previewUrl: imageData.url
