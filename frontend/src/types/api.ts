@@ -1,6 +1,14 @@
 export interface ApiMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | ContentPart[];
+}
+
+export interface ContentPart {
+  type: 'text' | 'image_url';
+  text?: string;
+  image_url?: {
+    url: string;
+  };
 }
 
 export interface ChatRequest {
@@ -18,7 +26,7 @@ export interface ApiError {
   message: string;
 }
 
-// New interfaces for streaming responses
+// Interfaces for streaming responses
 export interface StreamingMessage {
   id: string;
   text: string;
@@ -26,4 +34,13 @@ export interface StreamingMessage {
   timestamp: Date;
   isStreaming?: boolean;
   model?: string;
+  files?: FileAttachment[];
+}
+
+export interface FileAttachment {
+  id: string;
+  type: 'image' | 'document' | 'other';
+  name: string;
+  url: string;
+  previewUrl?: string;
 }

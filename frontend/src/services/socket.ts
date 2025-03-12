@@ -7,6 +7,8 @@ class SocketService {
   private socket: Socket | null = null;
   private connected: boolean = false;
   private registeredEvents: Set<string> = new Set();
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
   
   constructor() {
     this.initSocket();
@@ -23,17 +25,33 @@ class SocketService {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
       path: '/socket.io/',  // Default Socket.IO path
-    });
+      timeout: 60000,  // Increase connection timeout to 60s
+      pingTimeout: 60000,  // Increase ping timeout to 60s
+      pingInterval: 25000,  // Send ping every 25s
+    } as any);
 
     // Debug connection events
     this.socket.on('connect', () => {
       console.log('Socket connected successfully!', this.socket?.id);
       this.connected = true;
+      this.reconnectAttempts = 0;
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('Socket disconnected, reason:', reason);
       this.connected = false;
+      
+      // Handle reconnection if not explicitly disconnected by client
+      if (reason === 'io server disconnect' || reason === 'transport close') {
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          console.log(`Attempting to reconnect (${this.reconnectAttempts + 1}/${this.maxReconnectAttempts})...`);
+          setTimeout(() => {
+            this.reconnectAttempts++;
+            this.socket?.connect();
+          }, 1000 * Math.min(this.reconnectAttempts + 1, 5));
+        }
+      }
+      
       // Clear registered events on disconnect
       this.registeredEvents.clear();
     });
@@ -45,6 +63,12 @@ class SocketService {
 
     this.socket.on('error', (error) => {
       console.error('Socket error:', error);
+    });
+    
+    // Handle server heartbeats
+    this.socket.on('heartbeat', (data) => {
+      console.log('Received heartbeat:', data);
+      // This helps keep the connection alive during long operations
     });
   }
 
@@ -109,13 +133,40 @@ class SocketService {
       callback(data);
     });
   }
+  
+  // New event handler for image responses
+  onChatImage(callback: (data: { url: string }) => void) {
+    this.registerEvent<{url: string}>('chat_image', (data) => {
+      console.log('Chat image:', data);
+      callback(data);
+    });
+  }
 
-  sendChatRequest(messages: ApiMessage[], model: string = 'gemini-2.0-flash') {
+  // New method to listen for heartbeat events
+  onHeartbeat(callback: (data: { status: string }) => void) {
+    this.registerEvent<{status: string}>('heartbeat', (data) => {
+      console.log('Heartbeat received:', data);
+      callback(data);
+    });
+  }
+
+  sendChatRequest(messages: ApiMessage[], model?: string) {
     if (this.socket && this.connected) {
       console.log('Sending chat request:', { messages, model });
       this.socket.emit('chat_request', { messages, model });
     } else {
       console.error('Cannot send chat request: Socket not connected');
+      throw new Error('Socket not connected');
+    }
+  }
+  
+  // Updated to make model optional
+  sendMultimodalChatRequest(messages: ApiMessage[], fileUrls: string[] = [], model?: string) {
+    if (this.socket && this.connected) {
+      console.log('Sending multimodal chat request:', { messages, fileUrls, model });
+      this.socket.emit('multimodal_chat_request', { messages, fileUrls, model });
+    } else {
+      console.error('Cannot send multimodal chat request: Socket not connected');
       throw new Error('Socket not connected');
     }
   }

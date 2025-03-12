@@ -23,7 +23,7 @@ function App() {
   }, [darkMode]);
 
   const toggleDarkMode = () => {
-    setDarkMode(prev => !prev);
+    setDarkMode((prev: boolean) => !prev);
   };
 
   return (

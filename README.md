@@ -207,8 +207,8 @@ Found a bug or have a feature request? Please open an issue:
 ## Roadmap
 
 - [x] Implement streaming responses
+- [x] Support for file uploads and multimodal inputs
 - [ ] Add authentication and user accounts
-- [ ] Support for file uploads and multimodal inputs
 - [ ] Multiple AI model selection
 - [ ] Conversation history persistence
 - [ ] Mobile app version

@@ -108,6 +108,19 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0; }
   }
+
+  /* New styles for file attachments */
+  .file-attachment-preview {
+    @apply max-w-[150px] h-auto rounded border border-gray-200 dark:border-gray-700 overflow-hidden;
+  }
+  
+  .file-attachment-document {
+    @apply flex items-center gap-1 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700;
+  }
+  
+  .file-attachments-container {
+    @apply flex flex-wrap gap-2 mt-2;
+  }
 }
 
 :root {
