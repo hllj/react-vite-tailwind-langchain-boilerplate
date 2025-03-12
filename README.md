@@ -199,7 +199,7 @@ Contributions are welcome! Here's how you can help:
 
 Found a bug or have a feature request? Please open an issue:
 
-1. Go to the [Issues](https://github.com/hllj/react-vite-tailwind-boilerplate/issues) tab
+1. Go to the [Issues](https://github.com/hllj/react-vite-tailwind-langchain-boilerplate/issues) tab
 2. Click "New Issue"
 3. Select the appropriate template
 4. Provide as much detail as possible
@@ -208,6 +208,7 @@ Found a bug or have a feature request? Please open an issue:
 
 - [x] Implement streaming responses
 - [x] Support for file uploads and multimodal inputs
+- [ ] LangGraph supports to define multi-agent system.
 - [ ] Add authentication and user accounts
 - [ ] Multiple AI model selection
 - [ ] Conversation history persistence
