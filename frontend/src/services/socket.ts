@@ -109,6 +109,14 @@ class SocketService {
       callback(data);
     });
   }
+  
+  // New event handler for image responses
+  onChatImage(callback: (data: { url: string }) => void) {
+    this.registerEvent<{url: string}>('chat_image', (data) => {
+      console.log('Chat image:', data);
+      callback(data);
+    });
+  }
 
   sendChatRequest(messages: ApiMessage[], model: string = 'gemini-2.0-flash') {
     if (this.socket && this.connected) {
@@ -116,6 +124,17 @@ class SocketService {
       this.socket.emit('chat_request', { messages, model });
     } else {
       console.error('Cannot send chat request: Socket not connected');
+      throw new Error('Socket not connected');
+    }
+  }
+  
+  // New method to send multimodal chat request
+  sendMultimodalChatRequest(messages: ApiMessage[], fileUrls: string[] = [], model: string = 'gemini-2.0-pro-vision') {
+    if (this.socket && this.connected) {
+      console.log('Sending multimodal chat request:', { messages, fileUrls, model });
+      this.socket.emit('multimodal_chat_request', { messages, fileUrls, model });
+    } else {
+      console.error('Cannot send multimodal chat request: Socket not connected');
       throw new Error('Socket not connected');
     }
   }

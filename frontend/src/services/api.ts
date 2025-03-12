@@ -39,6 +39,39 @@ class ApiService {
       }
     }
   }
+
+  async uploadFile(file: File): Promise<string> {
+    try {
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch(`${this.baseUrl}/upload/`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw {
+          status: response.status,
+          message: errorData.detail || `HTTP error! status: ${response.status}`,
+        } as ApiError;
+      }
+
+      const data = await response.json();
+      return data.url;
+    } catch (error) {
+      if ((error as ApiError).status) {
+        throw error;
+      } else {
+        throw {
+          status: 0,
+          message: `File upload error: ${(error as Error).message || 'Unknown error'}`,
+        } as ApiError;
+      }
+    }
+  }
 }
 
 export const apiService = new ApiService(API_BASE_URL);

@@ -1,6 +1,6 @@
 import asyncio
 import socketio
-from typing import Dict, Any
+from typing import Dict, Any, List, Union
 
 # Create a Socket.IO server instance with proper CORS configuration
 sio = socketio.AsyncServer(
@@ -95,5 +95,72 @@ async def chat_request(sid, data):
         }, to=sid)
         
         # Clean up the session data
+        if sid in streaming_sessions:
+            del streaming_sessions[sid]
+
+@sio.event
+async def multimodal_chat_request(sid, data):
+    """Handle multimodal chat requests containing images and text"""
+    from .agents.chat_agent import ChatAgent
+    
+    chat_agent = ChatAgent()
+    print(f"Received multimodal chat request from {sid}")
+    
+    # Reset session tracking for this client
+    streaming_sessions[sid] = {"last_tokens": set(), "full_response": ""}
+    
+    # Extract data from the request
+    messages = data.get('messages', [])
+    file_urls = data.get('fileUrls', [])
+    model = data.get('model', 'gemini-2.0-pro-vision')  # Default to vision model
+    
+    print(f"Processing multimodal request with {len(file_urls)} files and model {model}")
+    
+    # Log the URLs for debugging
+    for i, url in enumerate(file_urls):
+        print(f"File URL {i+1}: {url}")
+    
+    # Notify client that processing is starting
+    await sio.emit('chat_start', {}, to=sid)
+    await asyncio.sleep(0.1)
+    
+    try:
+        # Start streaming response - pass the multimodal content
+        async for token in chat_agent.get_streaming_response(
+            messages=messages,
+            model=model
+        ):
+            # Process the same way as regular text responses
+            if token and isinstance(token, str):
+                if token not in streaming_sessions[sid]["last_tokens"]:
+                    await sio.emit('chat_token', {'token': token}, to=sid)
+                    streaming_sessions[sid]["full_response"] += token
+                    
+                    last_tokens = streaming_sessions[sid]["last_tokens"]
+                    last_tokens.add(token)
+                    if len(last_tokens) > 5:
+                        last_tokens.pop()
+                    
+                    await asyncio.sleep(0.01)
+                else:
+                    print(f"Skipping duplicate token: {token}")
+        
+        # Signal the end of streaming
+        await sio.emit('chat_complete', {
+            'status': 'success',
+            'model': model
+        }, to=sid)
+        
+        # Clean up
+        if sid in streaming_sessions:
+            del streaming_sessions[sid]
+            
+    except Exception as e:
+        print(f"Error in multimodal_chat_request for {sid}: {str(e)}")
+        await sio.emit('chat_error', {
+            'status': 'error',
+            'message': str(e)
+        }, to=sid)
+        
         if sid in streaming_sessions:
             del streaming_sessions[sid]
