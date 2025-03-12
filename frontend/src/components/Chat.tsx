@@ -46,6 +46,16 @@ export default function Chat() {
         console.log('[Chat Component] Chat stream starting');
       });
       
+      // Listen for heartbeats to know the server is still processing
+      socketService.onHeartbeat((data) => {
+        console.log('[Chat Component] Heartbeat received:', data.status);
+        // Reset any disconnection timers or update UI if needed
+        if (data.status === 'processing' || data.status === 'generating') {
+          // Keep the loading state active
+          setIsLoading(true);
+        }
+      });
+      
       socketService.onChatToken((token) => {
         console.log('[Chat Component] Received token:', token);
         
@@ -270,6 +280,11 @@ export default function Chat() {
         try {
           if (isMultimodal) {
             // Use vision model for multimodal requests
+            console.log('[Chat Component] Setting up multimodal request with images:', fileUrls);
+            
+            // Create a nicer prompt for image analysis if user didn't provide text
+            const defaultImagePrompt = "Please analyze this image and describe what you see.";
+            
             const multimodalMessages: ApiMessage[] = [
               {
                 role: 'user',
@@ -279,27 +294,26 @@ export default function Chat() {
                       type: 'image_url' as const,
                       image_url: { url }
                     })), 
-                    ...(userMessage.text ? [{
+                    {
                       type: 'text' as const,
-                      text: userMessage.text
-                    }] : [{
-                      type: 'text' as const, 
-                      text: 'What do you see in this image?'
-                    }])
-                  ] : userMessage.text || ''
+                      text: userMessage.text || defaultImagePrompt
+                    }
+                  ] : userMessage.text || defaultImagePrompt
               }
             ];
             
+            console.log('[Chat Component] Sending multimodal request with content:', 
+              JSON.stringify(multimodalMessages, null, 2).substring(0, 500) + '...');
+            
+            // Don't specify model name - let the server use the default vision model
             socketService.sendMultimodalChatRequest(
               multimodalMessages, 
-              fileUrls, 
-              'gemini-2.0-pro-vision' // Use vision model for images
+              fileUrls
             );
           } else {
             // Use regular chat model for text-only
             socketService.sendChatRequest(
-              apiMessages, 
-              'gemini-2.0-flash'
+              apiMessages
             );
           }
         } catch (error) {
