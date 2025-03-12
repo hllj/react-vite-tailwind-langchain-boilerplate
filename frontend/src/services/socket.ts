@@ -28,7 +28,7 @@ class SocketService {
       timeout: 60000,  // Increase connection timeout to 60s
       pingTimeout: 60000,  // Increase ping timeout to 60s
       pingInterval: 25000,  // Send ping every 25s
-    });
+    } as any);
 
     // Debug connection events
     this.socket.on('connect', () => {
