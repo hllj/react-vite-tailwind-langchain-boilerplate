@@ -47,8 +47,8 @@ export default function Chat() {
     // Check connection status every second
     const connectionChecker = setInterval(() => {
       const connected = socketService.isConnected();
-      chatActions.setSocketConnected(connected);
-      chatActions.setConnectionStatus(connected ? 'Connected' : 'Disconnected');
+      // Replace two separate dispatches with a single one
+      chatActions.updateConnectionStatus(connected);
     }, 1000);
 
     // Connect socket
@@ -122,8 +122,8 @@ export default function Chat() {
       };
     } catch (error) {
       console.error('[Chat Component] Error setting up socket:', error);
-      chatActions.setSocketConnected(false);
-      chatActions.setConnectionStatus('Error: Failed to connect');
+      // Replace two separate dispatches with a single one
+      chatActions.updateConnectionStatus(false, 'Error: Failed to connect');
       clearInterval(connectionChecker);
     }
   }, []); // Removed dependency on dispatch, using memoized functions instead

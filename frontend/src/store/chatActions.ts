@@ -11,6 +11,7 @@ import {
   toggleUseStreaming as _toggleUseStreaming,
   setSocketConnected as _setSocketConnected,
   setConnectionStatus as _setConnectionStatus,
+  updateConnectionStatus as _updateConnectionStatus,
   setSelectedFiles as _setSelectedFiles,
   addSelectedFiles as _addSelectedFiles,
   removeSelectedFile as _removeSelectedFile,
@@ -81,6 +82,15 @@ export const chatActions = {
   setConnectionStatus: (status: string) => 
     (dispatch: AppDispatch) => {
       dispatch(_setConnectionStatus(status));
+    },
+    
+  // Combined action for updating connection status
+  updateConnectionStatus: (connected: boolean, status?: string) => 
+    (dispatch: AppDispatch) => {
+      dispatch(_updateConnectionStatus({ 
+        connected, 
+        status 
+      }));
     },
 
   // Set selected files

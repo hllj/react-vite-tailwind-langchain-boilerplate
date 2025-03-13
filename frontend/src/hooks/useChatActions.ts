@@ -57,6 +57,12 @@ export const useChatActions = () => {
       [dispatch]
     ),
     
+    updateConnectionStatus: useCallback(
+      (connected: boolean, status?: string) => 
+        dispatch(chatActions.updateConnectionStatus(connected, status)),
+      [dispatch]
+    ),
+    
     setSelectedFiles: useCallback(
       (files: FileItem[]) => dispatch(chatActions.setSelectedFiles(files)),
       [dispatch]

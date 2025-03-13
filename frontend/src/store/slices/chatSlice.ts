@@ -76,6 +76,10 @@ export const chatSlice = createSlice({
     setConnectionStatus: (state, action: PayloadAction<string>) => {
       state.connectionStatus = action.payload;
     },
+    updateConnectionStatus: (state, action: PayloadAction<{connected: boolean; status?: string}>) => {
+      state.isSocketConnected = action.payload.connected;
+      state.connectionStatus = action.payload.status || (action.payload.connected ? 'Connected' : 'Disconnected');
+    },
     setSelectedFiles: (state, action: PayloadAction<{
       id: string;
       file: File;
@@ -125,6 +129,7 @@ export const {
   toggleUseStreaming,
   setSocketConnected,
   setConnectionStatus,
+  updateConnectionStatus,
   setSelectedFiles,
   addSelectedFiles,
   removeSelectedFile,
