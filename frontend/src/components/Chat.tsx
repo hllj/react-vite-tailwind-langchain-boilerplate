@@ -5,8 +5,9 @@ import { socketService } from '../services/socket';
 import { ApiMessage, FileAttachment } from '../types/api';
 import FileUpload, { FileItem } from './FileUpload';
 import ModelSelector from './ModelSelector';
-import { useAppSelector } from '../hooks/useAppSelector';
+import { useAppSelector, useAppDispatch } from '../hooks/useAppSelector';
 import { useChatActions } from '../hooks/useChatActions';
+import { updateViewportDimensions } from '../store/slices/uiSlice';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ChatProps {}
@@ -23,10 +24,11 @@ export default function Chat() {
     selectedFiles,
     showFileUpload
   } = useAppSelector(state => state.chat);
-  const { darkMode } = useAppSelector(state => state.ui);
+  const { darkMode, viewport } = useAppSelector(state => state.ui);
   
   // Use our custom actions hook
   const chatActions = useChatActions();
+  const dispatch = useAppDispatch();
   
   const [inputValue, setInputValue] = useState(''); // Keep input as local state
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -128,22 +130,29 @@ export default function Chat() {
     }
   }, []); // Removed dependency on dispatch, using memoized functions instead
   
-  // Handle mobile browser address bar showing/hiding
+  // Handle mobile browser address bar showing/hiding with Redux
   useEffect(() => {
     const handleVisualViewportResize = () => {
-      // Just trigger a visual update without actually changing state
-      const resizeEvent = new Event('resize');
-      window.dispatchEvent(resizeEvent);
+      // Instead of dispatching a DOM event, update Redux state
+      if (window.visualViewport) {
+        dispatch(updateViewportDimensions({
+          width: window.visualViewport.width,
+          height: window.visualViewport.height
+        }));
+      }
     };
 
     const viewport = window.visualViewport;
     if (viewport) {
       viewport.addEventListener('resize', handleVisualViewportResize);
+      // Initialize viewport dimensions
+      handleVisualViewportResize();
+      
       return () => {
         viewport.removeEventListener('resize', handleVisualViewportResize);
       };
     }
-  }, []);
+  }, [dispatch]);
 
   const handleFileSelect = (files: FileItem[]) => {
     chatActions.addSelectedFiles(files);

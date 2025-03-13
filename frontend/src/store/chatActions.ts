@@ -20,7 +20,6 @@ import {
   addFileToLastMessage as _addFileToLastMessage
 } from "./slices/chatSlice";
 import { AppDispatch } from "./index";
-import { RootState } from "./index";
 
 // Typed wrapper functions for chat actions to provide better TypeScript support
 export const chatActions = {
