@@ -146,16 +146,19 @@ A modern chat application built with React and FastAPI, featuring AI agents powe
 
 1. Open your browser and navigate to `http://localhost:5173`
 2. Start chatting with the AI agent
-3. The agent will respond using Google's Gemini model
+3. Select your preferred AI model from the dropdown menu
+4. The agent will respond using the selected Google Gemini model
 
 ## Features
 
 - **Modern, responsive UI** with dark mode support that adapts to any device size
 - **Real-time chat interface** with smooth animations and user-friendly design
-- **Powered by Google's Gemini AI model** for high-quality, context-aware responses
+- **Powered by Google's Gemini AI models** for high-quality, context-aware responses
+- **Multiple AI model selection** to choose between different Gemini models
 - **Streaming responses** for more natural conversation experience
 - **Conversation history** maintained throughout your session
 - **Error handling and loading states** for robust user experience
+- **File and image upload support** for multimodal conversations
 
 ## Project Structure
 
@@ -208,9 +211,9 @@ Found a bug or have a feature request? Please open an issue:
 
 - [x] Implement streaming responses
 - [x] Support for file uploads and multimodal inputs
-- [ ] LangGraph supports to define multi-agent system.
+- [x] Multiple AI model selection
+- [ ] LangGraph supports to define multi-agent system
 - [ ] Add authentication and user accounts
-- [ ] Multiple AI model selection
 - [ ] Conversation history persistence
 - [ ] Mobile app version
 

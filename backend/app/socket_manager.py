@@ -53,8 +53,9 @@ async def chat_request(sid, data):
     await asyncio.sleep(0.1)  # Small delay to ensure the start message is processed
     
     try:
-        # Get the model from the request or use default (let the agent decide)
+        # Get the model from the request or use default
         model = data.get('model')
+        print(f"Requested model: {model}")
         
         # Start streaming response
         async for token in chat_agent.get_streaming_response(
@@ -83,10 +84,14 @@ async def chat_request(sid, data):
                     print(f"Skipping duplicate token: {token}")
         
         print(f"Chat complete for {sid}, full response length: {len(streaming_sessions[sid]['full_response'])}")
+        
+        # Use the provided model or get the one that was actually used
+        used_model = model or chat_agent.text_model_name
+        
         # Signal the end of streaming with the complete response
         await sio.emit('chat_complete', {
             'status': 'success',
-            'model': model or chat_agent.text_model_name  # Use the actual model name
+            'model': used_model  # Return the model that was used
         }, to=sid)
         
         # Clean up the session data
@@ -121,7 +126,7 @@ async def multimodal_chat_request(sid, data):
     file_urls = data.get('fileUrls', [])
     model = data.get('model')  # Get model but let the agent decide which one to use
     
-    print(f"Processing multimodal request with {len(file_urls)} files")
+    print(f"Processing multimodal request with {len(file_urls)} files, using model: {model}")
     
     # Log the URLs for debugging
     for i, url in enumerate(file_urls):
@@ -158,7 +163,7 @@ async def multimodal_chat_request(sid, data):
                             img_url = part.get('image_url', {}).get('url', 'none')
                             print(f"    Part {j+1} image URL: {img_url[:50]}...")
             
-            # Start streaming response - pass the multimodal content
+            # Start streaming response - pass the multimodal content with model
             token_count = 0
             async for token in chat_agent.get_streaming_response(
                 messages=messages,
@@ -189,11 +194,14 @@ async def multimodal_chat_request(sid, data):
                     else:
                         print(f"Skipping duplicate token: {token}")
             
+            # Use the provided model or get the one that was actually used for multimodal
+            used_model = model or chat_agent.vision_model_name
+            
             # Signal the end of streaming
             if sid in connected_clients:
                 await sio.emit('chat_complete', {
                     'status': 'success',
-                    'model': chat_agent.vision_model_name  # Use the actual vision model name
+                    'model': used_model  # Return the actually used model
                 }, to=sid)
             
             # Clean up
@@ -221,7 +229,7 @@ async def multimodal_chat_request(sid, data):
         if sid in streaming_sessions:
             del streaming_sessions[sid]
 
-# New helper function to send periodic heartbeats
+# Helper function to send periodic heartbeats
 async def send_periodic_heartbeats(sid):
     """Send periodic heartbeats to keep the connection alive during long processing"""
     try:
