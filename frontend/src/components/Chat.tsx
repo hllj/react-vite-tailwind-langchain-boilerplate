@@ -386,11 +386,11 @@ export default function Chat() {
   };
   
   const toggleStreamingMode = () => {
-    chatActions.toggleStreamingMode(useStreaming);
+    chatActions.toggleStreamingMode();
   };
   
   const toggleFileUpload = () => {
-    chatActions.toggleFileUpload(showFileUpload);
+    chatActions.toggleFileUpload();
   };
 
   // Render file attachments in messages

@@ -17,6 +17,7 @@ import {
   addFileToLastMessage as _addFileToLastMessage
 } from "./slices/chatSlice";
 import { AppDispatch } from "./index";
+import { RootState } from "./index";
 
 // Typed wrapper functions for chat actions to provide better TypeScript support
 export const chatActions = {
@@ -62,6 +63,13 @@ export const chatActions = {
       dispatch(_setUseStreaming(useStreaming));
     },
 
+  // Toggle streaming mode
+  toggleStreamingMode: () => 
+    (dispatch: AppDispatch, getState: () => RootState) => {
+      const currentState = getState().chat.useStreaming;
+      dispatch(_setUseStreaming(!currentState));
+    },
+
   // Set socket connection status
   setSocketConnected: (connected: boolean) => 
     (dispatch: AppDispatch) => {
@@ -96,6 +104,13 @@ export const chatActions = {
   setShowFileUpload: (show: boolean) => 
     (dispatch: AppDispatch) => {
       dispatch(_setShowFileUpload(show));
+    },
+
+  // Toggle file upload visibility
+  toggleFileUpload: () => 
+    (dispatch: AppDispatch, getState: () => RootState) => {
+      const currentState = getState().chat.showFileUpload;
+      dispatch(_setShowFileUpload(!currentState));
     },
 
   // Add file attachment to last message

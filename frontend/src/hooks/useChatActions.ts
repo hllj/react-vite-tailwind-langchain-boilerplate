@@ -83,12 +83,12 @@ export const useChatActions = () => {
     ),
     
     toggleStreamingMode: useCallback(
-      (currentState: boolean) => dispatch(chatActions.setUseStreaming(!currentState)),
+      () => dispatch(chatActions.toggleStreamingMode()),
       [dispatch]
     ),
     
     toggleFileUpload: useCallback(
-      (currentState: boolean) => dispatch(chatActions.setShowFileUpload(!currentState)),
+      () => dispatch(chatActions.toggleFileUpload()),
       [dispatch]
     )
   };
