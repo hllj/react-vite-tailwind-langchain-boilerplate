@@ -1,26 +1,34 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { PaperAirplaneIcon, PaperClipIcon } from '@heroicons/react/24/solid';
 import { apiService } from '../services/api';
 import { socketService } from '../services/socket';
-import { ApiMessage, StreamingMessage, FileAttachment } from '../types/api';
+import { ApiMessage, FileAttachment } from '../types/api';
 import FileUpload, { FileItem } from './FileUpload';
 import ModelSelector from './ModelSelector';
+import { useAppSelector } from '../hooks/useAppSelector';
+import { useChatActions } from '../hooks/useChatActions';
+import { v4 as uuidv4 } from 'uuid';
 
-interface ChatProps {
-  darkMode?: boolean;
-}
+interface ChatProps {}
 
-export default function Chat({ darkMode = false }: ChatProps) {
-  const [messages, setMessages] = useState<StreamingMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSocketConnected, setIsSocketConnected] = useState(false);
-  const [useStreaming, setUseStreaming] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState('Disconnected');
-  const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
-  const [showFileUpload, setShowFileUpload] = useState(false);
-  const [selectedModel, setSelectedModel] = useState('gemini-1.5-pro');
+export default function Chat() {
+  const { 
+    messages, 
+    isLoading, 
+    error, 
+    selectedModel, 
+    useStreaming, 
+    isSocketConnected,
+    connectionStatus,
+    selectedFiles,
+    showFileUpload
+  } = useAppSelector(state => state.chat);
+  const { darkMode } = useAppSelector(state => state.ui);
+  
+  // Use our custom actions hook
+  const chatActions = useChatActions();
+  
+  const [inputValue, setInputValue] = useState(''); // Keep input as local state
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,8 +47,8 @@ export default function Chat({ darkMode = false }: ChatProps) {
     // Check connection status every second
     const connectionChecker = setInterval(() => {
       const connected = socketService.isConnected();
-      setIsSocketConnected(connected);
-      setConnectionStatus(connected ? 'Connected' : 'Disconnected');
+      chatActions.setSocketConnected(connected);
+      chatActions.setConnectionStatus(connected ? 'Connected' : 'Disconnected');
     }, 1000);
 
     // Connect socket
@@ -57,106 +65,55 @@ export default function Chat({ darkMode = false }: ChatProps) {
         console.log('[Chat Component] Heartbeat received:', data.status);
         // Reset any disconnection timers or update UI if needed
         if (data.status === 'processing' || data.status === 'generating') {
-          // Keep the loading state active
-          setIsLoading(true);
+          chatActions.setIsLoading(true);
         }
       });
       
       socketService.onChatToken((token) => {
         console.log('[Chat Component] Received token:', token);
-        
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1];
-          
-          if (lastMessage && lastMessage.isStreaming) {
-            // Create a new array to ensure React detects the change
-            const updatedMessages = [...prev];
-            updatedMessages[prev.length - 1] = {
-              ...lastMessage,
-              text: lastMessage.text + token
-            };
-            return updatedMessages;
-          }
-          return prev;
-        });
+        chatActions.appendToLastMessage(token);
       });
       
       socketService.onChatComplete((data) => {
         console.log('[Chat Component] Chat stream complete');
         
-        setMessages(prev => {
-          // Create a new array to ensure React detects the change
-          const updatedMessages = [...prev];
-          const lastMessage = prev[prev.length - 1];
-          
-          if (lastMessage && lastMessage.isStreaming) {
-            updatedMessages[prev.length - 1] = {
-              ...lastMessage,
-              isStreaming: false,
-              model: data.model
-            };
-          }
-          return updatedMessages;
+        chatActions.updateLastMessage({
+          isStreaming: false,
+          model: data.model
         });
         
-        setIsLoading(false);
+        chatActions.setIsLoading(false);
         inputRef.current?.focus();
       });
       
       socketService.onChatError((data) => {
         console.error('[Chat Component] Chat error:', data);
         
-        // Remove any streaming message first
-        setMessages(prev => {
-          if (prev.length > 0 && prev[prev.length - 1].isStreaming) {
-            return prev.slice(0, -1);
-          }
-          return prev;
+        // Add the error message
+        chatActions.addMessage({
+          id: uuidv4(),
+          text: `Sorry, I encountered an error: ${data.message || 'Please try again later.'}`,
+          sender: 'bot',
+          timestamp: new Date(),
         });
         
-        // Then add the error message
-        setMessages(prev => [
-          ...prev,
-          {
-            id: (Date.now() + 1).toString(),
-            text: `Sorry, I encountered an error: ${data.message || 'Please try again later.'}`,
-            sender: 'bot',
-            timestamp: new Date(),
-          }
-        ]);
-        
-        setError(data.message || 'Unknown error occurred');
-        setIsLoading(false);
+        chatActions.setError(data.message || 'Unknown error occurred');
+        chatActions.setIsLoading(false);
       });
       
       // Listen for multimodal responses with images
       socketService.onChatImage((imageData) => {
         console.log('[Chat Component] Received image in response:', imageData);
         
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1];
-          
-          if (lastMessage && lastMessage.isStreaming) {
-            // Add the image to the current message
-            const updatedMessage = {
-              ...lastMessage,
-              files: [...(lastMessage.files || []), {
-                id: `img_${Date.now()}`,
-                type: 'image' as const,
-                name: 'AI Generated Image',
-                url: imageData.url,
-                previewUrl: imageData.url
-              }]
-            };
-            
-            // Create a new array with the updated message
-            const updatedMessages = [...prev];
-            updatedMessages[prev.length - 1] = updatedMessage;
-            return updatedMessages;
-          }
-          
-          return prev;
-        });
+        const fileAttachment: FileAttachment = {
+          id: `img_${Date.now()}`,
+          type: 'image',
+          name: 'AI Generated Image',
+          url: imageData.url,
+          previewUrl: imageData.url
+        };
+        
+        chatActions.addFileToLastMessage(fileAttachment);
       });
       
       return () => {
@@ -165,16 +122,18 @@ export default function Chat({ darkMode = false }: ChatProps) {
       };
     } catch (error) {
       console.error('[Chat Component] Error setting up socket:', error);
-      setIsSocketConnected(false);
-      setConnectionStatus('Error: Failed to connect');
+      chatActions.setSocketConnected(false);
+      chatActions.setConnectionStatus('Error: Failed to connect');
       clearInterval(connectionChecker);
     }
-  }, []);
+  }, []); // Removed dependency on dispatch, using memoized functions instead
   
   // Handle mobile browser address bar showing/hiding
   useEffect(() => {
     const handleVisualViewportResize = () => {
-      setMessages(prev => [...prev]);
+      // Just trigger a visual update without actually changing state
+      const resizeEvent = new Event('resize');
+      window.dispatchEvent(resizeEvent);
     };
 
     const viewport = window.visualViewport;
@@ -187,23 +146,23 @@ export default function Chat({ darkMode = false }: ChatProps) {
   }, []);
 
   const handleFileSelect = (files: FileItem[]) => {
-    setSelectedFiles(prev => [...prev, ...files]);
+    chatActions.addSelectedFiles(files);
   };
 
   const handleFileRemove = (id: string) => {
-    setSelectedFiles(prev => prev.filter(file => file.id !== id));
+    chatActions.removeSelectedFile(id);
   };
 
   const handleModelChange = (modelId: string) => {
-    setSelectedModel(modelId);
+    chatActions.setSelectedModel(modelId);
   };
 
   const handleSendMessage = async () => {
     // Don't send if there's no text AND no files
     if ((!inputValue.trim() && selectedFiles.length === 0) || isLoading) return;
     
-    setIsLoading(true);
-    setError(null);
+    chatActions.setIsLoading(true);
+    chatActions.setError(null);
     
     try {
       // Process files first if any exist
@@ -242,21 +201,22 @@ export default function Chat({ darkMode = false }: ChatProps) {
       }
       
       // Create a new user message
-      const userMessage: StreamingMessage = {
-        id: Date.now().toString(),
+      const userMessageId = uuidv4();
+      const userMessage = {
+        id: userMessageId,
         text: inputValue.trim(),
-        sender: 'user',
+        sender: 'user' as const,
         timestamp: new Date(),
         files: fileAttachments.length > 0 ? fileAttachments : undefined
       };
       
       // Add user message to chat
-      setMessages(prev => [...prev, userMessage]);
+      chatActions.addMessage(userMessage);
       setInputValue('');
       
       // Clear file selection
-      setSelectedFiles([]);
-      setShowFileUpload(false);
+      chatActions.setSelectedFiles([]);
+      chatActions.setShowFileUpload(false);
       
       // Determine if this is a multimodal request (has images)
       const isMultimodal = fileUrls.length > 0;
@@ -276,17 +236,17 @@ export default function Chat({ darkMode = false }: ChatProps) {
         console.log('[Chat Component] Using streaming mode');
         
         // Create an empty bot message that will be filled by streaming
-        const streamingMessage: StreamingMessage = {
-          id: (Date.now() + 1).toString(),
+        const streamingMessage = {
+          id: uuidv4(),
           text: '',
-          sender: 'bot',
+          sender: 'bot' as const,
           timestamp: new Date(),
           isStreaming: true,
           model: selectedModel
         };
         
         // Add the streaming message placeholder
-        setMessages(prev => [...prev, streamingMessage]);
+        chatActions.addMessage(streamingMessage);
         
         try {
           if (isMultimodal) {
@@ -312,9 +272,6 @@ export default function Chat({ darkMode = false }: ChatProps) {
                   ] : userMessage.text || defaultImagePrompt
               }
             ];
-            
-            console.log('[Chat Component] Sending multimodal request with content:', 
-              JSON.stringify(multimodalMessages, null, 2).substring(0, 500) + '...');
             
             // Send the request with the selected model
             socketService.sendMultimodalChatRequest(
@@ -342,8 +299,8 @@ export default function Chat({ darkMode = false }: ChatProps) {
       }
     } catch (error) {
       console.error('[Chat Component] Error handling message send:', error);
-      setError((error as Error).message || 'Failed to process your message');
-      setIsLoading(false);
+      chatActions.setError((error as Error).message || 'Failed to process your message');
+      chatActions.setIsLoading(false);
     }
   };
   
@@ -391,31 +348,28 @@ export default function Chat({ darkMode = false }: ChatProps) {
       const data = await apiService.sendChatRequest(request);
       
       // Create bot message from response
-      const botMessage: StreamingMessage = {
-        id: (Date.now() + 1).toString(),
+      chatActions.addMessage({
+        id: uuidv4(),
         text: data.response,
         sender: 'bot',
         timestamp: new Date(),
         model: data.model
-      };
+      });
       
-      // Add bot message to chat
-      setMessages(prev => [...prev, botMessage]);
     } catch (error) {
       console.error('[Chat Component] Error sending message:', error);
       
       // Add error message
-      const errorMessage: StreamingMessage = {
-        id: (Date.now() + 1).toString(),
+      chatActions.addMessage({
+        id: uuidv4(),
         text: `Sorry, I encountered an error: ${(error as any).message || 'Please try again later.'}`,
         sender: 'bot',
         timestamp: new Date(),
-      };
+      });
       
-      setMessages(prev => [...prev, errorMessage]);
-      setError((error as any).message || 'Unknown error occurred');
+      chatActions.setError((error as any).message || 'Unknown error occurred');
     } finally {
-      setIsLoading(false);
+      chatActions.setIsLoading(false);
       inputRef.current?.focus();
     }
   };
@@ -432,11 +386,11 @@ export default function Chat({ darkMode = false }: ChatProps) {
   };
   
   const toggleStreamingMode = () => {
-    setUseStreaming(prev => !prev);
+    chatActions.toggleStreamingMode(useStreaming);
   };
   
   const toggleFileUpload = () => {
-    setShowFileUpload(prev => !prev);
+    chatActions.toggleFileUpload(showFileUpload);
   };
 
   // Render file attachments in messages
