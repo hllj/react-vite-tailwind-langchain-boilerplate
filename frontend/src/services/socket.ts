@@ -160,7 +160,7 @@ class SocketService {
     }
   }
   
-  // Updated to make model optional
+  // Updated to use the model parameter
   sendMultimodalChatRequest(messages: ApiMessage[], fileUrls: string[] = [], model?: string) {
     if (this.socket && this.connected) {
       console.log('Sending multimodal chat request:', { messages, fileUrls, model });

@@ -15,7 +15,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[Message]
-    model: Optional[str] = "gemini-2.0-flash"  # Default model
+    model: Optional[str] = "gemini-1.5-flash"  # Updated default model
 
 class ChatResponse(BaseModel):
     response: str

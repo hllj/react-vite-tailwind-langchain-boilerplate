@@ -4,8 +4,13 @@ import { apiService } from '../services/api';
 import { socketService } from '../services/socket';
 import { ApiMessage, StreamingMessage, FileAttachment } from '../types/api';
 import FileUpload, { FileItem } from './FileUpload';
+import ModelSelector from './ModelSelector';
 
-export default function Chat() {
+interface ChatProps {
+  darkMode?: boolean;
+}
+
+export default function Chat({ darkMode = false }: ChatProps) {
   const [messages, setMessages] = useState<StreamingMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -15,6 +20,7 @@ export default function Chat() {
   const [connectionStatus, setConnectionStatus] = useState('Disconnected');
   const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
   const [showFileUpload, setShowFileUpload] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gemini-1.5-pro');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -188,6 +194,10 @@ export default function Chat() {
     setSelectedFiles(prev => prev.filter(file => file.id !== id));
   };
 
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+  };
+
   const handleSendMessage = async () => {
     // Don't send if there's no text AND no files
     if ((!inputValue.trim() && selectedFiles.length === 0) || isLoading) return;
@@ -271,7 +281,8 @@ export default function Chat() {
           text: '',
           sender: 'bot',
           timestamp: new Date(),
-          isStreaming: true
+          isStreaming: true,
+          model: selectedModel
         };
         
         // Add the streaming message placeholder
@@ -305,15 +316,17 @@ export default function Chat() {
             console.log('[Chat Component] Sending multimodal request with content:', 
               JSON.stringify(multimodalMessages, null, 2).substring(0, 500) + '...');
             
-            // Don't specify model name - let the server use the default vision model
+            // Send the request with the selected model
             socketService.sendMultimodalChatRequest(
               multimodalMessages, 
-              fileUrls
+              fileUrls,
+              selectedModel
             );
           } else {
             // Use regular chat model for text-only
             socketService.sendChatRequest(
-              apiMessages
+              apiMessages,
+              selectedModel
             );
           }
         } catch (error) {
@@ -364,13 +377,13 @@ export default function Chat() {
               }
             ]
           }],
-          model: 'gemini-2.0-pro-vision',
+          model: selectedModel, // Use the selected model
         };
       } else {
-        // Regular text-only request
+        // Regular text-only request with selected model
         request = {
           messages: apiMessages,
-          model: 'gemini-2.0-flash',
+          model: selectedModel,
         };
       }
       
@@ -383,6 +396,7 @@ export default function Chat() {
         text: data.response,
         sender: 'bot',
         timestamp: new Date(),
+        model: data.model
       };
       
       // Add bot message to chat
@@ -464,7 +478,7 @@ export default function Chat() {
   return (
     <div className="chat-container">
       <div className="chat-controls flex justify-between items-center mb-2">
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button 
             onClick={toggleStreamingMode} 
             className={`text-xs px-2 py-1 rounded ${useStreaming ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
@@ -480,12 +494,22 @@ export default function Chat() {
           </button>
         </div>
         
-        <div className={`text-xs px-2 py-1 rounded ${
-          isSocketConnected 
-            ? 'bg-green-500 text-white' 
-            : 'bg-red-500 text-white'
-        }`}>
-          Socket: {connectionStatus}
+        <div className="flex items-center gap-2">
+          <div className="w-40">
+            <ModelSelector 
+              selectedModel={selectedModel}
+              onModelChange={handleModelChange}
+              darkMode={darkMode}
+            />
+          </div>
+          
+          <div className={`text-xs px-2 py-1 rounded ${
+            isSocketConnected 
+              ? 'bg-green-500 text-white' 
+              : 'bg-red-500 text-white'
+          }`}>
+            Socket: {connectionStatus}
+          </div>
         </div>
       </div>
       
@@ -508,7 +532,12 @@ export default function Chat() {
               <span className="cursor-animation">▌</span>
             )}
             {message.files && message.files.length > 0 && renderFileAttachments(message.files)}
-            <div className="message-time">{formatTime(message.timestamp)}</div>
+            <div className="flex justify-between items-center message-time">
+              <span className="text-xs opacity-70">
+                {message.model && message.sender === 'bot' ? `Model: ${message.model}` : ''}
+              </span>
+              <span>{formatTime(message.timestamp)}</span>
+            </div>
           </div>
         ))}
         

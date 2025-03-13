@@ -26,44 +26,55 @@ class ChatAgent:
         # Configure genai with API key for model listing
         genai.configure(api_key=api_key)
         
-        # Set the correct model names after checking available models
-        self.text_model_name = "gemini-1.5-pro"  # Updated from gemini-2.0-flash
-        self.vision_model_name = "gemini-1.5-pro" # Updated from gemini-2.0-pro-vision
+        # Define available models
+        self.available_models = {
+            "gemini-1.5-flash": {
+                "name": "gemini-1.5-flash",
+                "multimodal": False,
+                "temperature": 0.7,
+                "description": "Fast, efficient model for text-only conversations"
+            },
+            "gemini-1.5-pro": {
+                "name": "gemini-1.5-pro",
+                "multimodal": True,
+                "temperature": 0.7,
+                "description": "Advanced model with multimodal capabilities"
+            }
+        }
+        
+        # Set default models
+        self.text_model_name = "gemini-1.5-flash"  # Default for text
+        self.vision_model_name = "gemini-1.5-pro"  # Default for vision/multimodal
         
         # Print available models for debugging
         self._list_available_models()
         
-        # Non-streaming client for text-only
-        self.gemini_client = ChatGoogleGenerativeAI(
-            api_key=api_key,
-            model=self.text_model_name,
-            temperature=0.7
-        )
-        
-        # Vision model for images
-        self.vision_client = ChatGoogleGenerativeAI(
-            api_key=api_key,
-            model=self.vision_model_name,
-            temperature=0.7
-        )
-        
-        # Streaming-enabled clients
-        self.gemini_streaming_client = ChatGoogleGenerativeAI(
-            api_key=api_key,
-            model=self.text_model_name,
-            temperature=0.7,
-            streaming=True
-        )
-        
-        self.vision_streaming_client = ChatGoogleGenerativeAI(
-            api_key=api_key,
-            model=self.vision_model_name,
-            temperature=0.7,
-            streaming=True
-        )
+        # Create model clients
+        self._initialize_clients(api_key)
         
         # Add a simple cache for processed images to avoid redundant processing
         self._image_cache = {}
+        
+    def _initialize_clients(self, api_key):
+        """Initialize standard and streaming clients for each model"""
+        self.model_clients = {}
+        self.streaming_clients = {}
+        
+        for model_id, model_info in self.available_models.items():
+            # Standard client
+            self.model_clients[model_id] = ChatGoogleGenerativeAI(
+                api_key=api_key,
+                model=model_id,
+                temperature=model_info.get("temperature", 0.7)
+            )
+            
+            # Streaming client
+            self.streaming_clients[model_id] = ChatGoogleGenerativeAI(
+                api_key=api_key,
+                model=model_id,
+                temperature=model_info.get("temperature", 0.7),
+                streaming=True
+            )
     
     def _list_available_models(self):
         """List available Gemini models and their supported methods (for debugging)"""
@@ -76,6 +87,28 @@ class ChatAgent:
                     print(f"  Supported generation methods: {model.supported_generation_methods}")
         except Exception as e:
             print(f"Error listing models: {e}")
+    
+    def _select_model(self, requested_model: str, is_multimodal: bool) -> str:
+        """Select the appropriate model based on request type and user preference"""
+        if not requested_model:
+            # Use defaults if no model is specified
+            return self.vision_model_name if is_multimodal else self.text_model_name
+            
+        # Check if requested model exists in available models
+        if requested_model in self.available_models:
+            model_info = self.available_models[requested_model]
+            
+            # For multimodal requests, ensure the model supports it
+            if is_multimodal and not model_info.get("multimodal", False):
+                print(f"Warning: Requested model {requested_model} does not support multimodal input. Using {self.vision_model_name} instead.")
+                return self.vision_model_name
+                
+            # The requested model is suitable
+            return requested_model
+        else:
+            # Fallback to defaults
+            print(f"Warning: Requested model {requested_model} not found. Using default model.")
+            return self.vision_model_name if is_multimodal else self.text_model_name
     
     def _is_multimodal_request(self, messages: List[Dict[str, Any]]) -> bool:
         """Detect if a request contains multimodal content (images)"""
@@ -241,20 +274,22 @@ class ChatAgent:
     async def get_response(self, messages: List[Dict[str, Any]], model: str = None) -> str:
         """Get response from Gemini model"""
         try:
-            # Use provided model or default to text model
-            if not model or "vision" not in model:
-                model_to_use = self.text_model_name
-            else:
-                model_to_use = self.vision_model_name
+            # Determine if this is a multimodal request
+            is_multimodal = self._is_multimodal_request(messages)
+            
+            # Select the appropriate model
+            model_to_use = self._select_model(model, is_multimodal)
                 
             print(f"Using model: {model_to_use} for request")
                 
             # Convert messages to LangChain format
             converted_messages = self._convert_messages(messages)
             
-            # Choose the appropriate client based on content and model
-            is_multimodal = self._is_multimodal_request(messages)
-            client = self.vision_client if is_multimodal else self.gemini_client
+            # Use the appropriate client based on the selected model
+            client = self.model_clients.get(model_to_use)
+            if not client:
+                print(f"Warning: No client found for model {model_to_use}, falling back to default")
+                client = self.vision_client if is_multimodal else self.gemini_client
             
             # Make the request
             response = await client.ainvoke(converted_messages)
@@ -265,30 +300,24 @@ class ChatAgent:
     async def get_streaming_response(self, messages: List[Dict[str, Any]], model: str = None) -> AsyncGenerator[str, None]:
         """Get streaming response from Gemini model"""
         try:
-            # Use provided model or default to text model
-            if not model or "vision" not in model:
-                model_to_use = self.text_model_name
-            else:
-                model_to_use = self.vision_model_name
+            # Determine if this is a multimodal request
+            is_multimodal = self._is_multimodal_request(messages)
+            
+            # Select the appropriate model
+            model_to_use = self._select_model(model, is_multimodal)
                 
             print(f"Using model: {model_to_use} for streaming request")
             
             print("Converting messages for streaming...")
             converted_messages = self._convert_messages(messages)
             
-            # Choose the appropriate streaming client based on content and model
-            is_multimodal = self._is_multimodal_request(messages)
-            client = self.vision_streaming_client if is_multimodal else self.gemini_streaming_client
+            # Use the appropriate streaming client based on the selected model
+            client = self.streaming_clients.get(model_to_use)
+            if not client:
+                print(f"Warning: No streaming client found for model {model_to_use}, falling back to default")
+                client = self.vision_streaming_client if is_multimodal else self.gemini_streaming_client
             
             print(f"Starting streaming response with model: {model_to_use}, multimodal: {is_multimodal}")
-            
-            if is_multimodal:
-                print("Multimodal request details:")
-                for i, msg in enumerate(converted_messages):
-                    if hasattr(msg, 'content') and isinstance(msg.content, list):
-                        for j, part in enumerate(msg.content):
-                            if hasattr(part, 'type') and part.type == 'image_url':
-                                print(f"  Message {i}, Part {j}: {part.image_url}")
             
             # Stream the response
             stream = client.astream(converted_messages)
