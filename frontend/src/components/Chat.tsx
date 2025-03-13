@@ -6,7 +6,11 @@ import { ApiMessage, StreamingMessage, FileAttachment } from '../types/api';
 import FileUpload, { FileItem } from './FileUpload';
 import ModelSelector from './ModelSelector';
 
-export default function Chat() {
+interface ChatProps {
+  darkMode?: boolean;
+}
+
+export default function Chat({ darkMode = false }: ChatProps) {
   const [messages, setMessages] = useState<StreamingMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -495,6 +499,7 @@ export default function Chat() {
             <ModelSelector 
               selectedModel={selectedModel}
               onModelChange={handleModelChange}
+              darkMode={darkMode}
             />
           </div>
           

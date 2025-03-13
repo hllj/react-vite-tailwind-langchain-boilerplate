@@ -48,7 +48,7 @@ function App() {
       </header>
       <main className="flex-1 overflow-hidden">
         <div className="h-full container mx-auto px-4 py-2">
-          <Chat />
+          <Chat darkMode={darkMode} />
         </div>
       </main>
     </div>
