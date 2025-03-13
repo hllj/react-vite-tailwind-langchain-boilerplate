@@ -67,6 +67,9 @@ export const chatSlice = createSlice({
     setUseStreaming: (state, action: PayloadAction<boolean>) => {
       state.useStreaming = action.payload;
     },
+    toggleUseStreaming: (state) => {
+      state.useStreaming = !state.useStreaming;
+    },
     setSocketConnected: (state, action: PayloadAction<boolean>) => {
       state.isSocketConnected = action.payload;
     },
@@ -95,6 +98,9 @@ export const chatSlice = createSlice({
     setShowFileUpload: (state, action: PayloadAction<boolean>) => {
       state.showFileUpload = action.payload;
     },
+    toggleShowFileUpload: (state) => {
+      state.showFileUpload = !state.showFileUpload;
+    },
     addFileToLastMessage: (state, action: PayloadAction<FileAttachment>) => {
       const lastIndex = state.messages.length - 1;
       if (lastIndex >= 0) {
@@ -116,12 +122,14 @@ export const {
   setError,
   setSelectedModel,
   setUseStreaming,
+  toggleUseStreaming,
   setSocketConnected,
   setConnectionStatus,
   setSelectedFiles,
   addSelectedFiles,
   removeSelectedFile,
   setShowFileUpload,
+  toggleShowFileUpload,
   addFileToLastMessage,
 } = chatSlice.actions;
 

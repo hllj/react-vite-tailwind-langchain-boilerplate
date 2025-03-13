@@ -8,12 +8,14 @@ import {
   setError as _setError,
   setSelectedModel as _setSelectedModel,
   setUseStreaming as _setUseStreaming,
+  toggleUseStreaming as _toggleUseStreaming,
   setSocketConnected as _setSocketConnected,
   setConnectionStatus as _setConnectionStatus,
   setSelectedFiles as _setSelectedFiles,
   addSelectedFiles as _addSelectedFiles,
   removeSelectedFile as _removeSelectedFile,
   setShowFileUpload as _setShowFileUpload,
+  toggleShowFileUpload as _toggleShowFileUpload,
   addFileToLastMessage as _addFileToLastMessage
 } from "./slices/chatSlice";
 import { AppDispatch } from "./index";
@@ -65,9 +67,8 @@ export const chatActions = {
 
   // Toggle streaming mode
   toggleStreamingMode: () => 
-    (dispatch: AppDispatch, getState: () => RootState) => {
-      const currentState = getState().chat.useStreaming;
-      dispatch(_setUseStreaming(!currentState));
+    (dispatch: AppDispatch) => {
+      dispatch(_toggleUseStreaming());
     },
 
   // Set socket connection status
@@ -108,9 +109,8 @@ export const chatActions = {
 
   // Toggle file upload visibility
   toggleFileUpload: () => 
-    (dispatch: AppDispatch, getState: () => RootState) => {
-      const currentState = getState().chat.showFileUpload;
-      dispatch(_setShowFileUpload(!currentState));
+    (dispatch: AppDispatch) => {
+      dispatch(_toggleShowFileUpload());
     },
 
   // Add file attachment to last message
